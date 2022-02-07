@@ -45,17 +45,20 @@ public class main extends Application {
         txtApodo = new TextField();
         btnConectar=new Button("Conectar");
         btnConectar.setOnAction(event -> {
-            String apodo = txtApodo.getText();
-            if (apodo.trim().length() > 0)
-                 conectarServidor(txtServidor.getText(), Integer.parseInt(txtPuerto.getText()),
-                    txtApodo.getText());
-            else {
-                Alert dialogoError = new Alert(Alert.AlertType.ERROR);
-                dialogoError.setTitle("ERROR!");
-                dialogoError.setHeaderText("Datos insuficientes");
-                dialogoError.setContentText("Debe poner el apodo o nombre de usuario para conectarse");
-                dialogoError.showAndWait();
-            }
+            if (!conectado) {
+                String apodo = txtApodo.getText();
+                if (apodo.trim().length() > 0)
+                    conectarServidor(txtServidor.getText(), Integer.parseInt(txtPuerto.getText()),
+                            txtApodo.getText());
+                else {
+                    Alert dialogoError = new Alert(Alert.AlertType.ERROR);
+                    dialogoError.setTitle("ERROR!");
+                    dialogoError.setHeaderText("Datos insuficientes");
+                    dialogoError.setContentText("Debe poner el apodo o nombre de usuario para conectarse");
+                    dialogoError.showAndWait();
+                }
+            }else
+                desconectarServidor();
         });
         contenedorConexion.getChildren()
                 .addAll(lblServidor, txtServidor, lblPuerto, txtPuerto,
@@ -146,6 +149,23 @@ public class main extends Application {
         }
     }
 
+    private void desconectarServidor(){
+        hilo.stop();
+        hilo = null;
+        try {
+            enviarMensaje("******SALIR*********");
+            lector.close();
+            escritor.close();
+            conexion.close();
+        }catch (Exception e){
+
+        }
+        conectado = false;
+        habilitar_conexion(true);
+        habilitar_envio_mensaje(false);
+        txtMensajes.setText("");
+    }
+
     public boolean enviarMensaje(String mensaje){
         try {
             escritor.write(mensaje+"\n");
@@ -162,6 +182,8 @@ public class main extends Application {
             while (true){
                 try{
                     String mensaje = lector.readLine();
+                    if (mensaje.startsWith("+OK ") || mensaje.startsWith("+REQ"))
+                        continue;
                     Platform.runLater(new Runnable() {
                         @Override
                         public void run() {
