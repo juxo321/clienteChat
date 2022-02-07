@@ -1,4 +1,5 @@
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
@@ -10,8 +11,10 @@ import javafx.stage.Stage;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.Optional;
 
 public class main extends Application {
+    private boolean conectado=false;
     private Socket conexion;
     private BufferedReader lector;
     private BufferedWriter escritor;
@@ -19,6 +22,7 @@ public class main extends Application {
     private TextField txtMensaje;
     private TextArea txtMensajes;
     private Button btnConectar, btnEnviarMensaje;
+    private HiloEscuchaMensajes hilo;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -41,8 +45,17 @@ public class main extends Application {
         txtApodo = new TextField();
         btnConectar=new Button("Conectar");
         btnConectar.setOnAction(event -> {
-            conectarServidor(txtServidor.getText(), Integer.parseInt(txtPuerto.getText()),
+            String apodo = txtApodo.getText();
+            if (apodo.trim().length() > 0)
+                 conectarServidor(txtServidor.getText(), Integer.parseInt(txtPuerto.getText()),
                     txtApodo.getText());
+            else {
+                Alert dialogoError = new Alert(Alert.AlertType.ERROR);
+                dialogoError.setTitle("ERROR!");
+                dialogoError.setHeaderText("Datos insuficientes");
+                dialogoError.setContentText("Debe poner el apodo o nombre de usuario para conectarse");
+                dialogoError.showAndWait();
+            }
         });
         contenedorConexion.getChildren()
                 .addAll(lblServidor, txtServidor, lblPuerto, txtPuerto,
@@ -82,11 +95,32 @@ public class main extends Application {
         root.setCenter(panelMensajes);
         root.setBottom(panelMensaje);
 
+        habilitar_conexion(true);
+        habilitar_envio_mensaje(false);
 
-        primaryStage.setTitle("Bienvenido al chat");
+        primaryStage.setTitle("Bienvenido cliente de Chat FEI");
         primaryStage.setScene(new Scene(root, 680, 500));
         primaryStage.show();
+
+        hilo = new HiloEscuchaMensajes();
+        hilo.start();
     }
+
+    private void habilitar_conexion (boolean hab){
+        txtServidor.setDisable(!hab); //negacion
+        txtPuerto.setDisable(!hab);
+        txtApodo.setDisable(!hab);
+        if (hab)
+            btnConectar.setText("Conectar");
+        else
+            btnConectar.setText("Desconectar");
+    }
+
+    private void habilitar_envio_mensaje (boolean hab){
+        txtMensaje.setDisable(!hab); //negacion
+        btnEnviarMensaje.setDisable(!hab);
+    }
+
     private void conectarServidor(String servidor, int puerto, String apodo){
         try {
             conexion = new Socket(servidor, puerto);
@@ -96,9 +130,19 @@ public class main extends Application {
             escritor =
                     new BufferedWriter(
                             new OutputStreamWriter(conexion.getOutputStream()));
-            enviarMensaje(apodo);
-        } catch (Exception e){
+            if (enviarMensaje(apodo)){
+                conectado = true;
+                habilitar_conexion(false);
+                habilitar_envio_mensaje(true);
+            }else
+                throw new IOException("");
 
+        } catch (Exception e){
+            Alert dialogoError = new Alert(Alert.AlertType.ERROR);
+            dialogoError.setTitle("ERROR!");
+            dialogoError.setHeaderText("Existen problemas de conexión");
+            dialogoError.setContentText("Revisa tu conexión con el Servidor");
+            dialogoError.showAndWait();
         }
     }
 
@@ -112,6 +156,25 @@ public class main extends Application {
         }
 
     }
+
+    class HiloEscuchaMensajes extends Thread{
+        public void run(){
+            while (true){
+                try{
+                    String mensaje = lector.readLine();
+                    Platform.runLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            txtMensajes.appendText(mensaje + "\n");
+                        }
+                    });
+                }catch (Exception e){
+
+                }
+            }
+        }
+    }
+
     public static void main(String[] args) {
 
         launch(args);
